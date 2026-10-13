@@ -1,0 +1,102 @@
+{% extends "admin_base.html" %}
+{% block title %}AI База знань{% endblock %}
+{% block page_heading %}AI Knowledge{% endblock %}
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+<p class="page-sub">Редагуйте знання агента й дивіться щоденну звітність змін з чатів та дзвінків.</p>
+
+<div class="card">
+  <div class="cb-card-header">
+    <div class="cb-card-title"><i data-lucide="brain"></i> Поточний контекст знань</div>
+  </div>
+  <form method="post" action="/admin/ai-knowledge/save">
+    <label for="learned_context">Текст бази знань</label>
+    <textarea id="learned_context" name="learned_context" rows="16" style="font-family:var(--font-mono);font-size:0.82rem;">{{ profile.learned_context if profile else '' }}</textarea>
+    <div class="form-actions-row">
+      <button class="btn btn-primary" type="submit">Зберегти вручну</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="cb-card-header">
+    <div class="cb-card-title"><i data-lucide="refresh-cw"></i> Щоденне оновлення</div>
+  </div>
+  <p class="hint" style="margin-bottom:12px;">Зібрати нові чати/дзвінки, оновити AI-базу та створити звіт змін.</p>
+  <form method="post" action="/admin/ai-knowledge/update">
+    <button class="btn btn-outline" type="submit">Оновити AI-базу зараз</button>
+  </form>
+</div>
+
+<h2 class="section-title">Щоденні звіти змін</h2>
+<div class="card">
+  <div class="cb-card-header">
+    <div class="cb-card-title"><i data-lucide="line-chart"></i> Динаміка навчання</div>
+  </div>
+  <canvas id="learningChart" height="110"></canvas>
+</div>
+<div class="grid-cards">
+  {% for report in reports %}
+  <article class="tile" style="cursor:default;">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
+      <h3>Звіт {{ report.created_at | dt_kyiv }}</h3>
+      <span class="badge badge-info">{{ report.niche }}</span>
+    </div>
+    <div class="meta">Чати: {{ report.chats_count }} · Дзвінки: {{ report.calls_count }}</div>
+    <p style="white-space:pre-wrap;">{{ report.change_summary or '—' }}</p>
+  </article>
+  {% else %}
+  <p class="hint">Поки що немає звітів. Запустіть ручне оновлення.</p>
+  {% endfor %}
+</div>
+<script>
+  const labels = {{ chart_labels | tojson }};
+  const chats = {{ chart_chats | tojson }};
+  const calls = {{ chart_calls | tojson }};
+  if (labels.length > 0) {
+    const ctx = document.getElementById('learningChart');
+    const isLight = document.documentElement.classList.contains('light-theme');
+    const grid = isLight ? 'rgba(20,20,30,0.08)' : 'rgba(255,255,255,0.08)';
+    const tick = isLight ? '#4a5568' : '#94a3b8';
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Чати',
+            data: chats,
+            borderColor: '#25c5bd',
+            backgroundColor: 'rgba(37,197,189,0.16)',
+            tension: 0.32,
+            fill: true
+          },
+          {
+            label: 'Дзвінки',
+            data: calls,
+            borderColor: '#4ade80',
+            backgroundColor: 'rgba(74,222,128,0.14)',
+            tension: 0.32,
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { color: tick }
+          }
+        },
+        scales: {
+          x: { ticks: { color: tick }, grid: { color: grid } },
+          y: { beginAtZero: true, ticks: { precision: 0, color: tick }, grid: { color: grid } }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}

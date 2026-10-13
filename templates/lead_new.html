@@ -1,0 +1,48 @@
+{% extends "admin_base.html" %}
+{% block title %}Новий клієнт{% endblock %}
+{% block page_heading %}Новий клієнт{% endblock %}
+{% block nav_actions %}
+<a class="btn btn-ghost" href="/admin"><i data-lucide="arrow-left"></i> Назад</a>
+{% endblock %}
+{% block content %}
+<p class="page-sub">Додайте ліда вручну — дані одразу зʼявляться в CRM.</p>
+
+{% if error %}
+<div class="err">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="max-width:720px;">
+  <div class="cb-card-header">
+    <div class="cb-card-title"><i data-lucide="user-plus"></i> Картка клієнта</div>
+  </div>
+  <form method="post" action="/admin/lead/new">
+    <div class="form-row cols-2">
+      <div>
+        <label for="name">Імʼя</label>
+        <input id="name" type="text" name="name" placeholder="Іван Петренко" autocomplete="name">
+      </div>
+      <div>
+        <label for="phone">Телефон</label>
+        <input id="phone" type="tel" name="phone" placeholder="+380XXXXXXXXX або 380XXXXXXXXX" pattern="[+]?[3][8][0][0-9]{9}" title="Формат: +380XXXXXXXXX або 380XXXXXXXXX" autocomplete="tel">
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div>
+        <label for="telegram_user_id">Telegram user id</label>
+        <input id="telegram_user_id" type="text" name="telegram_user_id" value="manual" placeholder="manual">
+      </div>
+      <div>
+        <label for="username">Username</label>
+        <input id="username" type="text" name="username" placeholder="@username">
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="needs">Потреби</label>
+      <textarea id="needs" name="needs" rows="5" placeholder="Опишіть запит клієнта"></textarea>
+    </div>
+    <div class="form-actions-row">
+      <button class="btn btn-primary" type="submit">Створити картку</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

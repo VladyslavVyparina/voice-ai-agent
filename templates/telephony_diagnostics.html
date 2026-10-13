@@ -1,0 +1,127 @@
+{% extends "admin_base.html" %}
+{% block title %}Live Call Diagnostics{% endblock %}
+{% block page_heading %}Телефонія{% endblock %}
+{% block content %}
+<p class="page-sub">Стан інтеграції ElevenLabs SIP + Zadarma, останні дзвінки та швидка перевірка webhook.</p>
+
+<div class="stats-grid">
+  <div class="cb-stat">
+    <div class="cb-stat-label">Конфіг</div>
+    <div class="cb-stat-value">{{ ok_count }}/{{ checks_total }}</div>
+    <div class="cb-stat-sub">Активні параметри</div>
+  </div>
+  <div class="cb-stat">
+    <div class="cb-stat-label">Дзвінки</div>
+    <div class="cb-stat-value">{{ recent_calls|length }}</div>
+    <div class="cb-stat-sub">Останні записи</div>
+  </div>
+  <div class="cb-stat">
+    <div class="cb-stat-label">Провайдер</div>
+    <div class="cb-stat-value" style="font-size:1.1rem;margin-top:10px;">{{ checks[0][1] }}</div>
+    <div class="cb-stat-sub">Поточний маршрут</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="cb-card-header">
+    <div class="cb-card-title"><i data-lucide="settings-2"></i> Перевірка конфігурації</div>
+  </div>
+  <div class="table-wrap" style="margin:0;">
+    <table class="data">
+      <thead>
+        <tr><th>Параметр</th><th>Стан</th></tr>
+      </thead>
+      <tbody>
+      {% for key, value in checks %}
+        <tr>
+          <td><strong class="mono">{{ key }}</strong></td>
+          <td>
+            {% if value == "missing" %}
+            <span class="badge badge-danger">missing</span>
+            {% elif value == "-" %}
+            <span class="badge">-</span>
+            {% else %}
+            <span class="badge badge-success">{{ value }}</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="cb-card-header">
+    <div class="cb-card-title"><i data-lucide="webhook"></i> Налаштування webhook в ElevenLabs</div>
+  </div>
+  <p class="hint" style="margin-bottom:14px;">
+    URL webhook у вас уже правильний. Але для <strong>дзвінків AI-агента</strong> недостатньо галочки
+    «Transcription completed» у Developers — це інша подія (Speech-to-Text API).
+    Потрібен окремий крок у налаштуваннях агентів.
+  </p>
+  <ol style="margin:0 0 16px 20px;line-height:1.7;">
+    <li>
+      <strong>Webhook endpoint</strong> (у вас вже є) —
+      <a href="https://elevenlabs.io/app/developers/webhooks" target="_blank" rel="noopener">Developers → Webhooks</a>.
+      URL: <code class="mono">{{ webhook_url }}</code> — залиште як є, ENABLED.
+    </li>
+    <li style="margin-top:12px;">
+      <strong>Post-call webhook для агентів</strong> — відкрийте
+      <a href="https://elevenlabs.io/app/agents/settings" target="_blank" rel="noopener">ElevenAgents → Settings</a>
+      → розділ <em>Post-call webhooks</em> → увімкніть і <strong>оберіть</strong> ваш webhook зі списку.
+      Саме це надсилає подію <code>post_call_transcription</code> після дзвінка.
+    </li>
+  </ol>
+  <p class="hint" style="margin:0;">
+    Після збереження зробіть тестовий дзвінок — транскрипція зʼявиться в картці ліда автоматично.
+    Для старих дзвінків натисніть «Підтягнути транскрипцію» на сторінці ліда.
+  </p>
+</div>
+
+<div class="card">
+  <div class="cb-card-header">
+    <div class="cb-card-title"><i data-lucide="terminal"></i> Швидка перевірка webhook</div>
+  </div>
+  <p class="hint" style="margin-bottom:10px;">Запустіть на сервері, щоб перевірити endpoint ElevenLabs webhook:</p>
+  <pre class="curl-box">curl -X POST "{{ webhook_url }}" \
+-H "Content-Type: application/json" \
+-d '{"type":"post_call_transcription","data":{"agent_id":"test","conversation_id":"conv_test","status":"done","conversation_initiation_client_data":{"dynamic_variables":{"lead_id":"1"}},"transcript":[{"role":"agent","message":"Вітаю"},{"role":"user","message":"Тест"}]}}'</pre>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden;">
+  <div class="cb-card-header" style="margin:var(--gap-lg) var(--gap-lg) 0;padding-bottom:10px;">
+    <div class="cb-card-title"><i data-lucide="phone"></i> Останні дзвінки</div>
+  </div>
+  <div class="table-wrap" style="margin:0;border:none;border-radius:0;max-height:none;">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Час</th>
+          <th>Provider</th>
+          <th>Status</th>
+          <th>Call ID</th>
+          <th>Причина збою</th>
+          <th>Summary</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in recent_calls %}
+        <tr>
+          <td style="white-space:nowrap;" class="mono text-muted">{{ c.created_at | dt_kyiv }}</td>
+          <td>{{ c.provider }}</td>
+          <td><span class="badge">{{ c.status }}</span></td>
+          <td class="mono">{{ c.call_id or '—' }}</td>
+          <td style="max-width:260px;color:var(--color-danger);">
+            {{ c.reason or '—' }}
+          </td>
+          <td>{{ (c.summary or '—')[:120] }}{% if c.summary and c.summary|length > 120 %}…{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6"><div class="empty-state">Ще немає записів дзвінків.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

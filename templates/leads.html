@@ -1,0 +1,94 @@
+{% extends "admin_base.html" %}
+{% block title %}Ліди{% endblock %}
+{% block page_heading %}Ліди{% endblock %}
+{% block nav_actions %}
+<a class="btn btn-primary" href="/admin/lead/new"><i data-lucide="plus"></i> Новий клієнт</a>
+<a class="btn btn-outline" href="/admin/export/csv">CSV</a>
+<a class="btn btn-outline" href="/admin/export/json">JSON</a>
+{% endblock %}
+{% block content %}
+<p class="page-sub">Огляд заявок з Telegram, історія діалогів і дзвінків.</p>
+
+<div class="stats-grid">
+  <div class="cb-stat">
+    <div class="cb-stat-label">Ліди</div>
+    <div class="cb-stat-value">{{ leads|length }}</div>
+    <div class="cb-stat-sub">Усього в CRM</div>
+  </div>
+  <div class="cb-stat">
+    <div class="cb-stat-label">AI-звіти</div>
+    <div class="cb-stat-value">{{ reports_count }}</div>
+    <div class="cb-stat-sub">Щоденні оновлення</div>
+  </div>
+  <a class="tile" href="/admin/ai-knowledge" style="text-decoration:none;color:inherit;">
+    <h3>AI Knowledge</h3>
+    <div class="meta">Керування знаннями та звітами</div>
+    <p>Оновити базу, переглянути зміни, редагувати контекст.</p>
+  </a>
+</div>
+
+<div class="card">
+  <div class="cb-card-header">
+    <div class="cb-card-title"><i data-lucide="upload"></i> Імпорт бази</div>
+  </div>
+  <p class="hint" style="margin-bottom:12px;">Підтримуються файли .csv та .json.</p>
+  <form method="post" action="/admin/import" enctype="multipart/form-data">
+    <div class="import-grid">
+      <div>
+        <label for="import-file">Файл</label>
+        <input id="import-file" type="file" name="file" accept=".csv,.json" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Імпортувати</button>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden;">
+  <div class="table-wrap" style="margin:0;border:none;border-radius:0;max-height:none;">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Імʼя</th>
+          <th>Телефон</th>
+          <th>Потреба</th>
+          <th>Статус</th>
+          <th>Створено</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr onclick="window.location='/admin/lead/{{ lead.id }}'" style="cursor:pointer;">
+          <td><strong class="mono">#{{ lead.id }}</strong></td>
+          <td>{{ lead.name or '—' }}</td>
+          <td>{{ lead.phone or '—' }}</td>
+          <td>{{ (lead.needs or '—')[:72] }}{% if lead.needs and lead.needs|length > 72 %}…{% endif %}</td>
+          <td><span class="badge badge-primary">{{ lead.status }}</span></td>
+          <td class="text-muted" style="font-size:0.78rem;">{{ lead.created_at | dt_kyiv }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6"><div class="empty-state">Лідів ще немає. Підключіть бота або додайте клієнта вручну.</div></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2 class="section-title">Картки</h2>
+<div class="grid-cards">
+  {% for lead in leads %}
+  <article class="tile" onclick="window.location='/admin/lead/{{ lead.id }}'" style="cursor:pointer;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <h3>{{ lead.name or 'Без імені' }}</h3>
+      <span class="badge">{{ lead.status }}</span>
+    </div>
+    <div class="meta">#{{ lead.id }} · {{ lead.phone or 'Телефон не вказано' }}</div>
+    <p>{{ (lead.needs or 'Потреба не вказана')[:140] }}{% if lead.needs and lead.needs|length > 140 %}…{% endif %}</p>
+  </article>
+  {% else %}
+  <p class="hint" style="grid-column:1/-1;">Немає карток для відображення.</p>
+  {% endfor %}
+</div>
+{% endblock %}

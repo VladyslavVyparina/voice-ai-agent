@@ -1,0 +1,149 @@
+{% extends "admin_base.html" %}
+{% block title %}Демо дзвінки з сайту{% endblock %}
+{% block page_heading %}Демо дзвінки з сайту{% endblock %}
+{% block nav_actions %}
+<a class="btn btn-outline" href="/admin">← Всі ліди</a>
+{% endblock %}
+{% block content %}
+<p class="page-sub">Ліди, які залишили телефон через кнопку «Демонстрація AI-агента» на сайті, та записи їх дзвінків.</p>
+
+{% set calls_list = lead_calls.values() | selectattr('id', 'defined') | list %}
+{% set completed_list = calls_list | selectattr('status', 'in', ['completed', 'done', 'success', 'successful']) | list %}
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-bottom: 16px;">
+  <div class="cb-stat">
+    <div class="cb-stat-label">Всього заявок</div>
+    <div class="cb-stat-value">{{ leads|length }}</div>
+    <div class="cb-stat-sub">Демо з сайту</div>
+  </div>
+  <div class="cb-stat">
+    <div class="cb-stat-label">Дзвінків ініційовано</div>
+    <div class="cb-stat-value">{{ calls_list | length }}</div>
+    <div class="cb-stat-sub">AI-дзвінків</div>
+  </div>
+  <div class="cb-stat">
+    <div class="cb-stat-label">Завершено успішно</div>
+    <div class="cb-stat-value">{{ completed_list | length }}</div>
+    <div class="cb-stat-sub">Дзвінків</div>
+  </div>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden;">
+  <div class="cb-card-header" style="padding: 14px 16px 12px;">
+    <div class="cb-card-title"><i data-lucide="phone-outgoing"></i> Демо-дзвінки з сайту</div>
+  </div>
+  <div class="table-wrap" style="margin:0;border:none;border-radius:0;max-height:none;">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Ім'я</th>
+          <th>Телефон</th>
+          <th>Статус ліда</th>
+          <th>Дзвінок</th>
+          <th>Статус дзвінка</th>
+          <th>Провайдер</th>
+          <th>Дата</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        {% set call = lead_calls.get(lead.id) %}
+        <tr>
+          <td><strong class="mono">#{{ lead.id }}</strong></td>
+          <td>{{ lead.name or '—' }}</td>
+          <td>
+            {% if lead.phone %}
+              <a href="tel:+{{ lead.phone }}" style="font-family:var(--font-mono);font-size:0.82rem;">{{ lead.phone }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <span class="badge
+              {% if lead.status == 'demo' %}badge-info
+              {% elif lead.status == 'new' %}badge-primary
+              {% elif lead.status == 'done' %}badge-success
+              {% else %}badge-warning{% endif %}">
+              {{ lead.status }}
+            </span>
+          </td>
+          <td>
+            {% if call %}
+              <span class="mono" style="font-size:0.75rem;">{{ call.created_at | dt_kyiv }}</span>
+            {% else %}
+              <span style="color:var(--text-muted);font-size:0.8rem;">Немає</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if call %}
+              {% set in_prog = is_call_in_progress(call) %}
+              {% set has_real = not is_placeholder_transcript(call.transcript) %}
+              {% if in_prog %}
+                <span class="badge badge-warning" style="animation:callPulse 1.2s ease-in-out infinite;">⟳ У процесі</span>
+              {% elif has_real and call.status in ['completed', 'done', 'success', 'successful', 'no_webhook_timeout'] %}
+                <span class="badge badge-success">✓ Завершено</span>
+              {% elif call.status in ['completed', 'done', 'success', 'successful'] %}
+                <span class="badge badge-success">✓ Завершено</span>
+              {% elif call.status == 'initiated' %}
+                <span class="badge badge-info">→ Ініційовано</span>
+              {% elif call.status == 'no_webhook_timeout' %}
+                <span class="badge badge-warning">Очікуємо транскрипцію</span>
+              {% else %}
+                <span class="badge badge-danger">
+                  {{ friendly_call_status(call) }}
+                </span>
+              {% endif %}
+            {% else %}
+              <span class="badge">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if call %}
+              <span style="font-size:0.78rem;color:var(--text-muted);">{{ call.provider or '—' }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-muted" style="font-size:0.78rem;">{{ lead.created_at | dt_kyiv }}</td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <a class="btn btn-sm btn-outline" href="/admin/lead/{{ lead.id }}">Деталі</a>
+              {% if lead.phone %}
+              <form method="post" action="/admin/lead/{{ lead.id }}/call" style="display:inline;">
+                <button type="submit" class="btn btn-sm btn-primary"
+                  onclick="return confirm('Зателефонувати AI-агентом на {{ lead.phone }}?')">
+                  <i data-lucide="phone-call"></i> Дзвонити
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9">
+            <div class="empty-state">
+              <div style="font-size:2rem;margin-bottom:8px;">📞</div>
+              <div>Демо-дзвінків із сайту ще немає.</div>
+              <div style="font-size:0.8rem;margin-top:4px;">Коли користувач натисне «Демонстрація AI-агента» на сайті — запис з'явиться тут.</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% for lead in leads %}
+{% set call = lead_calls.get(lead.id) %}
+{% if call and call.transcript | is_real_transcript %}
+<details class="card" style="margin-bottom:8px;">
+  <summary style="cursor:pointer;font-weight:600;font-size:0.88rem;padding:2px 0;">
+    <span class="mono">#{{ lead.id }}</span>
+    {{ lead.name or lead.phone or '—' }} — транскрипт дзвінка
+    {% if call.status %}<span class="badge badge-info" style="margin-left:8px;">{{ call.status }}</span>{% endif %}
+  </summary>
+  <pre style="white-space:pre-wrap;font-size:0.78rem;font-family:var(--font-mono);margin-top:10px;color:var(--text-secondary);max-height:300px;overflow-y:auto;">{{ call.transcript }}</pre>
+</details>
+{% endif %}
+{% endfor %}
+
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "admin_base.html" %}
+{% block title %}Кабінет{% endblock %}
+{% block page_heading %}Мій кабінет{% endblock %}
+{% block content %}
+<p class="page-sub">Оформіть профіль: ім'я та аватар. Логін змінюється лише через політики доступу власника.</p>
+
+{% if saved %}
+<div class="ok">Профіль збережено.</div>
+{% endif %}
+
+<div class="card" style="max-width:760px;">
+  <div class="cb-card-header">
+    <div class="cb-card-title"><i data-lucide="circle-user"></i> Профіль</div>
+  </div>
+  <form method="post" action="/admin/profile">
+    <div class="form-row cols-2">
+      <div>
+        <label>Email (логін, тільки перегляд)</label>
+        <input type="text" value="{{ admin_user.email }}" readonly>
+      </div>
+      <div>
+        <label>Роль</label>
+        <input type="text" value="{{ admin_user.role }}" readonly>
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div>
+        <label for="display_name">Ім'я в кабінеті</label>
+        <input id="display_name" name="display_name" type="text" value="{{ admin_profile.display_name or '' }}" placeholder="Софія">
+      </div>
+      <div>
+        <label for="avatar_url">URL аватарки</label>
+        <input id="avatar_url" name="avatar_url" type="url" value="{{ admin_profile.avatar_url or '' }}" placeholder="https://...">
+      </div>
+    </div>
+    <div class="form-actions-row">
+      <button class="btn btn-primary" type="submit">Зберегти профіль</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

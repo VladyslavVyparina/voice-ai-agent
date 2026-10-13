@@ -1,0 +1,77 @@
+{% extends "admin_base.html" %}
+{% block title %}Команда{% endblock %}
+{% block page_heading %}Команда{% endblock %}
+{% block content %}
+<p class="page-sub">Керуйте доступом менеджерів: ролі, активація та створення облікових записів.</p>
+
+<div class="card">
+  <div class="cb-card-header">
+    <div class="cb-card-title"><i data-lucide="user-plus"></i> Додати користувача</div>
+  </div>
+  <form method="post" action="/admin/users">
+    <div class="form-row cols-2">
+      <div>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="text" placeholder="manager@company.com" required>
+      </div>
+      <div>
+        <label for="password">Пароль</label>
+        <input id="password" name="password" type="password" required>
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div>
+        <label for="role">Роль</label>
+        <select id="role" name="role">
+          <option value="manager">manager</option>
+          <option value="owner">owner</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <button class="btn btn-primary" type="submit">Створити користувача</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden;">
+  <div class="table-wrap" style="margin:0;border:none;border-radius:0;max-height:none;">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Email</th>
+          <th>Роль</th>
+          <th>Статус</th>
+          <th>Створено</th>
+          <th>Дія</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for u in users %}
+        <tr>
+          <td class="mono">#{{ u.id }}</td>
+          <td>{{ u.email }}</td>
+          <td><span class="badge badge-primary">{{ u.role }}</span></td>
+          <td>
+            {% if u.is_active %}
+            <span class="badge badge-success">active</span>
+            {% else %}
+            <span class="badge badge-danger">disabled</span>
+            {% endif %}
+          </td>
+          <td class="text-muted" style="font-size:0.78rem;">{{ u.created_at | dt_kyiv }}</td>
+          <td>
+            <form method="post" action="/admin/users/{{ u.id }}/toggle">
+              <button class="btn btn-outline btn-sm" type="submit">{{ 'Вимкнути' if u.is_active else 'Увімкнути' }}</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6"><div class="empty-state">Користувачів поки немає.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "admin_base.html" %}
+{% block title %}Вхід{% endblock %}
+{% block content %}
+<div class="cb-login-card">
+  <div class="cb-card-header">
+    <div class="cb-card-title">
+      <span class="cb-brand-icon" style="width:28px;height:28px;font-size:13px;">P</span>
+      Pulse AI · Вхід
+    </div>
+  </div>
+  <p class="hint" style="margin-bottom:14px;">Увійдіть email-ом і паролем адміністратора.</p>
+  {% if error %}
+  <div class="err">{{ error }}</div>
+  {% endif %}
+  <form method="post" action="/admin/login">
+    <div class="form-row">
+      <label for="email">Email</label>
+      <input id="email" type="text" name="email" value="{{ default_email or '' }}" required autofocus autocomplete="username">
+    </div>
+    <div class="form-row">
+      <label for="password">Пароль</label>
+      <input id="password" type="password" name="password" required autocomplete="current-password">
+    </div>
+    <div class="form-actions-row">
+      <button class="btn btn-primary" type="submit" style="width:100%;min-height:42px;">Увійти</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
