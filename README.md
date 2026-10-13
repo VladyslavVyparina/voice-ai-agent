@@ -38,3 +38,8 @@ Fill the example env with your own bot token and SIP credentials.
 ## What this public copy leaves out
 
 `.env` and `crm.db`.
+
+## Documents
+
+- `sip_proxy/README.md` is the Asterisk bridge: TLS from ElevenLabs, UDP to Zadarma, number normalization, CallerID, and what to do when one mobile network still rejects the call.
+- `agent_prompts/valeriy/README.md` splits the voice agent into four files: how he speaks, what he knows, the goal of one call, and the CRM fields written after it. Do not merge those files into one prompt.

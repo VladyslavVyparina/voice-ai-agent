@@ -1,193 +1,163 @@
-# SIP-проксі: ElevenLabs ↔ Asterisk ↔ Zadarma
+# SIP proxy: ElevenLabs, Asterisk, Zadarma
 
-Asterisk на вашому VPS працює як посередник між ElevenLabs (TLS/SRTP, кодек Opus/PCMA) і Zadarma (UDP, кодек PCMA/PCMU).
+Asterisk on your VPS sits between ElevenLabs (TLS and SRTP, Opus or PCMA) and Zadarma (UDP, PCMA or PCMU).
 
 ```
-ElevenLabs ──TLS:5061──► Asterisk на VPS ──UDP:5060──► Zadarma ──► оператори (Київстар, Vodafone, Lifecell)
-                        bot-telegram.ai-agent.website                pbx.zadarma.com
+ElevenLabs --TLS:5061--> Asterisk on the VPS --UDP:5060--> Zadarma --> the mobile networks
 ```
 
-## Що робить проксі
+The ElevenLabs address in this project is `bot-telegram.ai-agent.website`. Zadarma’s PBX is `pbx.zadarma.com`.
 
-1. Приймає виклики від ElevenLabs по TLS:5061 (TLS-сертифікат береться з Let's Encrypt).
-2. Перекодовує медіа з SRTP/Opus у звичайний RTP/PCMA — формат, який стабільно приймає Zadarma.
-3. Нормалізує номер: `+380XXXXXXXXX` / `380XXXXXXXXX` / `0XXXXXXXXX` → `0XXXXXXXXX`.
-4. Підставляє коректний `CallerID` (ваш Zadarma-номер) — без нього Zadarma часто блокує дзвінки на Lifecell/Vodafone.
-5. Реєструється на Zadarma як SIP-клієнт і відправляє виклик через зареєстрований trunk (стабільніше, ніж anonymous).
+## What the proxy does
 
-> ⚠️ Проксі **не зможе** виправити проблему, якщо її коренем є **маршрутизація Zadarma до конкретного оператора** (зокрема Lifecell). У такому випадку треба паралельно тримати другого SIP-провайдера (наприклад, Binotel/Stream Telecom/Sippy) і робити failover у dialplan. Як це додати — описано в кінці.
+1. Accepts calls from ElevenLabs on TLS port 5061. The certificate is Let’s Encrypt.
+2. Converts SRTP/Opus to ordinary RTP/PCMA, which Zadarma accepts reliably.
+3. Normalizes the number: `+380XXXXXXXXX`, `380XXXXXXXXX`, or `0XXXXXXXXX` becomes `0XXXXXXXXX`.
+4. Sets a real CallerID (your Zadarma number). Without it, Zadarma often blocks calls to some Ukrainian mobile networks.
+5. Registers on Zadarma as a SIP client and sends the call through that trunk. That is more stable than an anonymous invite.
 
-## Чому при прямому ElevenLabs → Zadarma з’являється «такі дзвінки можливі тільки всередині країни»
+The proxy cannot fix a route that Zadarma itself will not complete to one operator. In that case keep a second SIP provider and fail over in the dialplan. The last section shows the shape of that dialplan.
 
-Підтримка Zadarma пояснює це так: **національний** український номер розрахований на обслуговування **в межах країни**. Коли ElevenLabs підключається до Zadarma **напряму**, сигналізація та/або медіа йдуть з інфраструктури ElevenLabs (часто **США або інша країна**). Zadarma бачить **закордонне походження** виклику на лінію з типом «національний» і відхиляє його відповідним повідомленням.
+## Why a direct ElevenLabs to Zadarma call is rejected as “in-country only”
 
-**Як проксі Asterisk це змінює**
+Zadarma support describes a national Ukrainian number as a number that is served inside the country. When ElevenLabs connects straight to Zadarma, signaling or media often comes from ElevenLabs infrastructure in another country. Zadarma sees a foreign origin on a national line and rejects it.
 
-Тут два окремі «ноги» виклику:
+The proxy splits the call into two legs:
 
-1. **ElevenLabs → ваш Asterisk** — зовнішня сесія лише до вашого домену (TLS). Це не той маршрут, який Zadarma оцінює як «національний вихід у мережу».
-2. **Asterisk → Zadarma** — Asterisk як зареєстрований SIP-клієнт відправляє вже **новий** вихідний виклик на `pbx.zadarma.com`. Цей трафік має виходити з **публічної IP-адреси вашого VPS**. Якщо VPS фізично в **Україні** (або IP явно дозволений Zadarma як домашній для вашого акаунту — уточніть у підтримки), для Zadarma це виглядає як **звичайний внутрішній** SIP-вихід національного номера, а не як міжнародний «привіз» з США.
+1. ElevenLabs to your Asterisk is only a TLS session to your domain. Zadarma does not treat that leg as the national exit.
+2. Asterisk to Zadarma is a new outbound call from a registered SIP client to `pbx.zadarma.com`. That traffic leaves from the public IP of your VPS. If that VPS is in Ukraine, or Zadarma has allowed that IP as the home address for the account, Zadarma sees a normal national exit.
 
-**Важливо:** якщо Asterisk стоїть на VPS у **Німеччині, Нідерландах, США** тощо, помилка про «лише в межах країни» може **зберегтися**, бо друга нога все одно йде «не з України». У такому випадку потрібен **український** VPS або інший продукт Zadarma/інший провайдер без такого обмеження.
+If Asterisk runs in another country, the “in-country only” error can remain, because the second leg is still not from Ukraine. Then you need a Ukrainian VPS, or a Zadarma product or another provider without that limit.
 
-Після налаштування в ElevenLabs у полі **Address** має бути **ваш проксі** (`bot-telegram.ai-agent.website`), а **не** `sip.zadarma.com` — інакше ви знову на прямому шляху ElevenLabs → Zadarma.
+In ElevenLabs the Address field must be your proxy, not `sip.zadarma.com`. Otherwise you are back on the direct path.
 
-## Передумови
+## Before you start
 
-- Ubuntu 20.04 / 22.04 / 24.04 на VPS.
-- Для національного номера Zadarma: **VPS з Asterisk має бути в Україні** (або IP дозволений Zadarma як домашній для вашого SIP — інакше помилка «лише в межах країни» може не зникнути).
-- Домен `bot-telegram.ai-agent.website` указує на IP цього VPS (A-запис).
-- Уже існує сертифікат Let's Encrypt: `/etc/letsencrypt/live/bot-telegram.ai-agent.website/`.
-- У Zadarma в кабінеті дозволені вихідні дзвінки і відомі **SIP-логін/пароль** (не той, що для входу в особистий кабінет).
+- Ubuntu 20.04, 22.04, or 24.04 on the VPS.
+- For a national Zadarma number, the Asterisk VPS should be in Ukraine, or the IP must be allowed by Zadarma as the home SIP address.
+- The domain points at this VPS with an A record.
+- A Let’s Encrypt certificate already exists for that domain.
+- Outbound calls are enabled in the Zadarma cabinet, and you have the SIP login and password. That password is not the password for the web cabinet.
 
-## Деплой за 4 кроки
+## Deploy
 
-### 1. Залити папку `sip_proxy/` на VPS
-
-З локальної машини:
+### 1. Copy `sip_proxy/` to the VPS
 
 ```bash
-scp -r /Users/macbookpro/Desktop/bot_ai-agent/sip_proxy root@bot-telegram.ai-agent.website:/root/
+scp -r sip_proxy root@your-vps:/root/
 ```
 
-### 2. Установити Asterisk
-
-На VPS:
+### 2. Install Asterisk
 
 ```bash
 cd /root/sip_proxy
 sudo bash install.sh
 ```
 
-Скрипт:
-- встановить `asterisk` та `asterisk-modules`,
-- видасть Asterisk доступ до Let's Encrypt (через групу `ssl-cert`),
-- підкладе наші конфіги в `/etc/asterisk/`,
-- відкриє у фаєрволі порти `5060/udp`, `5061/tcp`, `10000-20000/udp`,
-- запустить сервіс.
+The script installs Asterisk and its modules, grants Asterisk access to the Let’s Encrypt files through the `ssl-cert` group, copies the configs into `/etc/asterisk/`, opens `5060/udp`, `5061/tcp`, and `10000-20000/udp`, and starts the service.
 
-### 3. Заповнити креденшли
+### 3. Fill credentials
 
 ```bash
 sudo bash configure.sh
 ```
 
-Скрипт інтерактивно запитає:
-- публічний IP VPS (визначається автоматично — підтвердіть Enter),
-- Zadarma SIP-логін (формат `558542-100`) і пароль,
-- ваш Zadarma номер для CallerID (наприклад `380931775053`),
-- пароль, який ElevenLabs використовуватиме для авторизації на нашому проксі (придумайте довгий, скопіюйте — потрібен у наступному кроці).
+It asks for the public IP (detected automatically; confirm with Enter), the Zadarma SIP login (shape `558542-100`) and password, the CallerID number, and a long password ElevenLabs will use to authenticate to this proxy. Copy that password. You need it in the next step.
 
-Після завершення скрипт виведе стан реєстрації. Має бути `Registered` напроти `zadarma-registration`.
+When it finishes, `zadarma-registration` should say `Registered`.
 
-### 4. Переключити ElevenLabs на новий trunk
+### 4. Point ElevenLabs at the new trunk
 
-У ElevenLabs Dashboard → **Phone Numbers** → ваш SIP trunk номер → **Outbound Configuration**:
+ElevenLabs Dashboard, Phone Numbers, your SIP trunk, Outbound configuration:
 
-| Поле | Значення |
+| Field | Value |
 |---|---|
-| **Address** | `bot-telegram.ai-agent.website` |
-| **Port** | `5061` |
-| **Transport** | `TLS` |
-| **Username** | `elevenlabs` |
-| **Password** | (пароль, який ви ввели на кроці 3) |
-| **Outbound number** | ваш Zadarma номер у E.164, напр. `+380931775053` |
-| **Media encryption** | `Allowed` (SRTP) |
+| Address | your proxy domain |
+| Port | `5061` |
+| Transport | `TLS` |
+| Username | `elevenlabs` |
+| Password | the password from step 3 |
+| Outbound number | your Zadarma number in E.164 |
+| Media encryption | `Allowed` (SRTP) |
 
-Збережіть. Виклики тепер ідуть через ваш VPS.
+Save. Calls now go through the VPS.
 
-## Перевірка
+## Checks
 
-### А. Реєстрація Zadarma
+Registration:
 
 ```bash
 sudo asterisk -rx 'pjsip show registrations'
 ```
 
-Має бути `Registered`. Якщо `Rejected` — невірний логін/пароль або IP VPS не в whitelist у Zadarma.
+`Registered` is the healthy state. `Rejected` means a wrong login or password, or the VPS IP is not on the Zadarma allow list.
 
-### Б. Live-логи під час дзвінка
+Live log during a test call from the CRM:
 
 ```bash
 sudo asterisk -rvvvvv
 ```
 
-У сусідньому вікні запустіть тестовий виклик через CRM. У логах має бути:
+You want lines that show the call entering from ElevenLabs, the dial to Zadarma, and a connected PJSIP channel. `403 Forbidden` from Zadarma is a bad CallerID or a cabinet restriction. `486 Busy` or `480 Temporarily Unavailable` is operator routing, covered next.
 
-```
-== IN ELEVENLABS +380: +380931775053
-== Dialing Zadarma: 0931775053
-== Connected to PJSIP/0931775053-...
-```
-
-Якщо бачите `403 Forbidden` від Zadarma — неправильний CallerID або обмеження в Zadarma.
-Якщо `486 Busy` / `480 Temporarily Unavailable` — проблема в маршрутизації оператора (див. наступний розділ).
-
-### В. SIP-трейс
+SIP trace:
 
 ```bash
 sudo asterisk -rx 'pjsip set logger on'
 sudo tail -f /var/log/asterisk/full
 ```
 
-Усі SIP-пакети йтимуть у лог. Корисно для діалогу з підтримкою Zadarma/ElevenLabs.
+Turn the logger off when you are done: `sudo asterisk -rx 'pjsip set logger off'`.
 
-## Якщо Lifecell все одно не дзвонить
+## If one mobile network still does not connect
 
-Це означає, що Zadarma не маршрутизує дзвінки на цього оператора з вашого номера. Варіанти:
+Zadarma is not routing that operator from your number.
 
-1. **Контакт із Zadarma-підтримкою** — надайте `Call-ID` з логів і час; нехай вони перевірять маршрут.
-2. **Додати другий SIP-trunk** (Binotel / Stream / Sippy) і зробити failover. У `pjsip.conf` додаєте другий endpoint `binotel`, у `extensions.conf`:
+1. Send Zadarma support the `Call-ID` and the time from the log.
+2. Add a second trunk and fail over. In `extensions.conf`:
 
-   ```
-   exten => _X.,1,Dial(PJSIP/${EXTEN}@zadarma,30)
-    same => n,GotoIf($["${DIALSTATUS}" = "ANSWER"]?hangup)
-    same => n,Dial(PJSIP/${EXTEN}@binotel,30)
-    same => n(hangup),Hangup()
-   ```
+```
+exten => _X.,1,Dial(PJSIP/${EXTEN}@zadarma,30)
+ same => n,GotoIf($["${DIALSTATUS}" = "ANSWER"]?hangup)
+ same => n,Dial(PJSIP/${EXTEN}@second-provider,30)
+ same => n(hangup),Hangup()
+```
 
-   Asterisk спочатку пробує Zadarma, якщо за 30 с немає відповіді — пробує Binotel.
+Asterisk tries Zadarma, then the second provider if nobody answers in 30 seconds. The second endpoint has to exist in `pjsip.conf`.
 
-3. **Винести ElevenLabs на іншого SIP-провайдера** з прямою маршрутизацією на всі українські оператори (наприклад, Stream Telecom з мобільним номером).
+3. Or move ElevenLabs to a provider that already routes to every Ukrainian mobile network.
 
-## Структура файлів
+## Files
 
 ```
 sip_proxy/
-├── README.md            ← цей файл
-├── install.sh           ← інсталяція Asterisk + копіювання конфігів
-├── configure.sh         ← заповнення креденшлів і релоад
-├── pjsip.conf           ← транспорти + endpoint elevenlabs + endpoint zadarma
-├── extensions.conf      ← діалплан з нормалізацією номерів
-├── rtp.conf             ← порти RTP 10000-20000
-├── logger.conf          ← рівні логів
-└── asterisk.conf        ← runuser/rungroup
+├── README.md
+├── install.sh
+├── configure.sh
+├── pjsip.conf          transports, elevenlabs endpoint, zadarma endpoint
+├── extensions.conf     dialplan and number normalization
+├── rtp.conf            RTP ports 10000-20000
+├── logger.conf
+└── asterisk.conf
 ```
 
-## Якщо немає `transport-tls` (лише UDP)
+## If `transport-tls` is missing and only UDP exists
 
-1. Переконайся, що в `/etc/asterisk/pjsip.conf` **немає** рядків з `__PUBLIC_IP__` — це невалідна адреса, TLS-транспорт може не створитися. Запусти `configure.sh` до кінця або заміни плейсхолдери вручну на `173.242.58.156` (свій IP).
-2. Перезапуск: `sudo systemctl restart asterisk`, потім `sudo asterisk -rx 'pjsip show transports'`.
-3. Перевір модуль TLS: `ls /usr/lib/asterisk/modules/res_pjsip_transport_tls.so` і `sudo asterisk -rx 'module show like transport_tls'`.
-4. Логи: `sudo journalctl -u asterisk -b --no-pager | tail -120` — шукай рядки про TLS/cert.
+1. `/etc/asterisk/pjsip.conf` must not still contain `__PUBLIC_IP__`. That is not a valid address, and the TLS transport may never be created. Finish `configure.sh`, or replace the placeholders with the VPS public IP.
+2. `sudo systemctl restart asterisk`, then `sudo asterisk -rx 'pjsip show transports'`.
+3. Check the module: `ls /usr/lib/asterisk/modules/res_pjsip_transport_tls.so` and `sudo asterisk -rx 'module show like transport_tls'`.
+4. `sudo journalctl -u asterisk -b --no-pager | tail -120` and look for TLS or certificate lines.
 
-## Якщо Zadarma показує `Rejected`
+## If Zadarma shows `Rejected`
 
-У виводі `pjsip show endpoints` не має бути літералу `__ZADARMA_SIP_USER__` — якщо він є, **configure не завершив заміну**. Запусти `sudo bash configure.sh` ще раз: на питання про IP натисни лише **Enter** (не вставляй команди). Перевір реальний SIP-логін і пароль у кабінеті Zadarma; за потреби додай IP VPS у whitelist SIP.
+`pjsip show endpoints` must not still show the literal `__ZADARMA_SIP_USER__`. If it does, `configure.sh` did not finish the replacement. Run it again. On the IP question, press Enter only. Check the SIP login and password in the Zadarma cabinet, and add the VPS IP to the SIP allow list if the cabinet has one.
 
-## Корисні команди
+## Useful commands
 
 ```bash
-# рестарт Asterisk
 sudo systemctl restart asterisk
-
-# тільки релоад конфігів (без розриву викликів)
 sudo asterisk -rx 'pjsip reload'
 sudo asterisk -rx 'dialplan reload'
-
-# перегляд активних викликів
 sudo asterisk -rx 'core show channels'
-
-# вимкнути SIP-логер після діагностики
 sudo asterisk -rx 'pjsip set logger off'
 ```
